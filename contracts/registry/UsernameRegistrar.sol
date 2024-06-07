@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC0-1.0
 
-pragma solidity 0.5.11;
+pragma solidity 0.8.19;
 
 import "../common/MerkleProof.sol";
 import "../common/Controlled.sol";
@@ -79,7 +79,6 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
         bytes32 _reservedUsernamesMerkleRoot,
         address _parentRegistry
     )
-        public
     {
         require(address(_token) != address(0), "No ERC20Token address defined.");
         require(address(_ensRegistry) != address(0), "No ENS address defined.");
@@ -106,7 +105,8 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
      * - Usernames registered with less then `usernameMinLength` characters can be slashed.
      * - Usernames contained in the merkle tree of root `reservedUsernamesMerkleRoot` can be slashed.
      * - Usernames starting with `0x` and bigger then 12 characters can be slashed.
-     * - If terms of the contract change—e.g. Status makes contract upgrades—the user has the right to release the username and get their deposit back.
+     * - If terms of the contract change—e.g. Status makes contract upgrades—the user has the
+     * right to release the username and get their deposit back.
      * @param _label Choosen unowned username hash.
      * @param _account Optional address to set at public resolver.
      * @param _pubkeyA Optional pubkey part A to set at public resolver.
@@ -157,7 +157,7 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
             address newOwner = ensRegistry.owner(ensNode);
             //Low level call, case dropUsername not implemented or failing, proceed release.
             //Return of this call have no use.
-            newOwner.call.gas(80000)(
+            newOwner.call{gas:80000}(
                 abi.encodeWithSelector(
                     this.dropUsername.selector,
                     _label
@@ -222,10 +222,10 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
     {
         bytes memory username = bytes(_username);
         require(username.length > 12, "Too small to look like an address.");
-        require(username[0] == byte("0"), "First character need to be 0");
-        require(username[1] == byte("x"), "Second character need to be x");
+        require(username[0] == bytes1("0"), "First character need to be 0");
+        require(username[1] == bytes1("x"), "Second character need to be x");
         for(uint i = 2; i < 7; i++){
-            byte b = username[i];
+            bytes1 b = username[i];
             require((b >= 0x30 && b <= 0x39) || (b >= 0x61 && b <= 0x66), "Does not look like an address");
         }
         slashUsername(username, _reserveSecret);
@@ -269,7 +269,7 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
     {
         bytes memory username = bytes(_username);
         require(username.length > _offendingPos, "Invalid position.");
-        byte b = username[_offendingPos];
+        bytes1 b = username[_offendingPos];
 
         require(!((b >= 0x30 && b <= 0x39) || (b >= 0x61 && b <= 0x7A)), "Not invalid character.");
 
@@ -549,6 +549,7 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
         bytes memory _data
     )
         public
+        override
     {
         require(_amount == price, "Wrong value");
         require(_token == address(token), "Wrong token");
@@ -752,7 +753,11 @@ contract UsernameRegistrar is Controlled, ApproveAndCallFallBack {
     /**
      * @dev Decodes abi encoded data with selector for "register(bytes32,address,bytes32,bytes32)".
      * @param _data Abi encoded data.
-     * @return Decoded registry call.
+     * @return sig Method selector.
+     * @return label Username hash.
+     * @return account Address to set at public resolver.
+     * @return pubkeyA Pubkey part A to set at public resolver.
+     * @return pubkeyB Pubkey part B to set at public resolver.
      */
     function abiDecodeRegister(
         bytes memory _data
