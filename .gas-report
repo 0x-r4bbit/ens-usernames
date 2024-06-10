@@ -1,17 +1,91 @@
-| script/Deploy.s.sol:Deploy contract |                 |        |        |        |         |
-|-------------------------------------|-----------------|--------|--------|--------|---------|
-| Deployment Cost                     | Deployment Size |        |        |        |         |
-| 320782                              | 2729            |        |        |        |         |
-| Function Name                       | min             | avg    | median | max    | # calls |
-| run                                 | 221942          | 221942 | 221942 | 221942 | 1       |
+| contracts/ens/ENSRegistry.sol:ENSRegistry contract |                 |       |        |       |         |
+|----------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                    | Deployment Size |       |        |       |         |
+| 707068                                             | 3510            |       |        |       |         |
+| Function Name                                      | min             | avg   | median | max   | # calls |
+| owner                                              | 532             | 892   | 532    | 2532  | 61      |
+| resolver                                           | 475             | 475   | 475    | 475   | 2       |
+| setOwner                                           | 2310            | 2776  | 2310   | 5110  | 6       |
+| setResolver                                        | 4371            | 8351  | 4371   | 24271 | 5       |
+| setSubnodeOwner                                    | 2984            | 23205 | 24884  | 26884 | 51      |
 
 
-| src/Foo.sol:Foo contract |                 |     |        |     |         |
-|--------------------------|-----------------|-----|--------|-----|---------|
-| Deployment Cost          | Deployment Size |     |        |     |         |
-| 20275                    | 131             |     |        |     |         |
-| Function Name            | min             | avg | median | max | # calls |
-| id                       | 235             | 235 | 235    | 235 | 1       |
+| contracts/ens/PublicResolver.sol:PublicResolver contract |                 |       |        |       |         |
+|----------------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                          | Deployment Size |       |        |       |         |
+| 1650257                                                  | 8310            |       |        |       |         |
+| Function Name                                            | min             | avg   | median | max   | # calls |
+| addr                                                     | 498             | 498   | 498    | 498   | 1       |
+| pubkey                                                   | 4675            | 4675  | 4675   | 4675  | 1       |
+| setAddr                                                  | 27096           | 27096 | 27096  | 27096 | 1       |
+
+
+| contracts/mocks/Dummy2UsernameRegistrar.sol:Dummy2UsernameRegistrar contract |                 |        |        |        |         |
+|------------------------------------------------------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                                                              | Deployment Size |        |        |        |         |
+| 4090449                                                                      | 20632           |        |        |        |         |
+| Function Name                                                                | min             | avg    | median | max    | # calls |
+| activate                                                                     | 46280           | 46813  | 46280  | 54280  | 15      |
+| controller                                                                   | 2392            | 2392   | 2392   | 2392   | 1       |
+| ensNode                                                                      | 384             | 2217   | 2384   | 2384   | 12      |
+| ensRegistry                                                                  | 2438            | 2438   | 2438   | 2438   | 1       |
+| getAccountBalance                                                            | 527             | 527    | 527    | 527    | 4       |
+| getAccountOwner                                                              | 540             | 540    | 540    | 540    | 3       |
+| getCreationTime                                                              | 512             | 512    | 512    | 512    | 7       |
+| migrateRegistry                                                              | 54281           | 54281  | 54281  | 54281  | 1       |
+| moveRegistry                                                                 | 84502           | 84502  | 84502  | 84502  | 1       |
+| parentRegistry                                                               | 2393            | 2393   | 2393   | 2393   | 1       |
+| price                                                                        | 385             | 1635   | 2385   | 2385   | 16      |
+| register                                                                     | 157183          | 163160 | 157183 | 216955 | 10      |
+| release                                                                      | 39929           | 39929  | 39929  | 39929  | 1       |
+| releaseDelay                                                                 | 285             | 285    | 285    | 285    | 5       |
+| reserveSlash                                                                 | 44801           | 44801  | 44801  | 44801  | 7       |
+| reservedUsernamesMerkleRoot                                                  | 2364            | 2364   | 2364   | 2364   | 1       |
+| resolver                                                                     | 2396            | 2396   | 2396   | 2396   | 1       |
+| slashAddressLikeUsername                                                     | 872             | 11929  | 1126   | 44593  | 4       |
+| slashInvalidUsername                                                         | 1061            | 22143  | 22143  | 43226  | 2       |
+| slashSmallUsername                                                           | 45098           | 45098  | 45098  | 45098  | 1       |
+| state                                                                        | 419             | 419    | 419    | 419    | 2       |
+| token                                                                        | 2436            | 2436   | 2436   | 2436   | 1       |
+| updateRegistryPrice                                                          | 10652           | 10652  | 10652  | 10652  | 1       |
+| usernameMinLength                                                            | 2364            | 2364   | 2364   | 2364   | 1       |
+
+
+| contracts/test/MerkleProofWrapper.sol:MerkleProofWrapper contract |                 |      |        |      |         |
+|-------------------------------------------------------------------|-----------------|------|--------|------|---------|
+| Deployment Cost                                                   | Deployment Size |      |        |      |         |
+| 141990                                                            | 741             |      |        |      |         |
+| Function Name                                                     | min             | avg  | median | max  | # calls |
+| verifyProof                                                       | 1149            | 1450 | 1596   | 1606 | 3       |
+
+
+| contracts/token/TestToken.sol:TestToken contract |                 |       |        |       |         |
+|--------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                  | Deployment Size |       |        |       |         |
+| 455093                                           | 2305            |       |        |       |         |
+| Function Name                                    | min             | avg   | median | max   | # calls |
+| allowance                                        | 756             | 756   | 756    | 756   | 10      |
+| approve                                          | 24705           | 24705 | 24705  | 24705 | 10      |
+| mint                                             | 46724           | 46724 | 46724  | 46724 | 10      |
+| transfer                                         | 23213           | 24713 | 25213  | 25213 | 4       |
+| transferFrom                                     | 26302           | 26302 | 26302  | 26302 | 10      |
+
+
+| script/DeployTest.s.sol:DeployTest contract |                 |         |         |         |         |
+|---------------------------------------------|-----------------|---------|---------|---------|---------|
+| Deployment Cost                             | Deployment Size |         |         |         |         |
+| 17233829                                    | 86753           |         |         |         |         |
+| Function Name                               | min             | avg     | median  | max     | # calls |
+| deployRegistry                              | 8248356         | 8248356 | 8248356 | 8248356 | 20      |
+| run                                         | 2993199         | 2993199 | 2993199 | 2993199 | 22      |
+
+
+| script/DeploymentTestConfig.s.sol:DeploymentTestConfig contract |                 |       |        |       |         |
+|-----------------------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                                 | Deployment Size |       |        |       |         |
+| 1094584                                                         | 5168            |       |        |       |         |
+| Function Name                                                   | min             | avg   | median | max   | # calls |
+| activeNetworkConfig                                             | 9274            | 10152 | 9274   | 45274 | 82      |
 
 
 

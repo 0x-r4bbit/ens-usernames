@@ -37,6 +37,42 @@ contract ENSDependentTest is Test {
 
         assert(ensRegistry.owner(ETH_NAMEHASH) == deployer);
     }
+
+    function registerName(
+        TestToken token,
+        UsernameRegistrar usernameRegistrar,
+        address registrant,
+        string memory username,
+        address account,
+        bytes32 pubkeyA,
+        bytes32 pubkeyB
+    )
+        internal
+        returns (bytes32 label, bytes32 nameHash)
+    {
+        label = keccak256(abi.encodePacked(username));
+        nameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
+        uint256 price = usernameRegistrar.price();
+
+        token.mint(registrant, price);
+        vm.prank(registrant);
+        token.approve(address(usernameRegistrar), price);
+
+        vm.prank(registrant);
+        usernameRegistrar.register(label, account, pubkeyA, pubkeyB);
+    }
+
+    function registerName(
+        TestToken token,
+        UsernameRegistrar usernameRegistrar,
+        address registrant,
+        string memory username
+    )
+        internal
+        returns (bytes32 label, bytes32 nameHash)
+    {
+        return registerName(token, usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
+    }
 }
 
 contract UsernameRegistrarDeployTest is ENSDependentTest {
@@ -112,17 +148,9 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testRegisterUsername() public {
         address registrant = testUser;
         string memory username = "testuser";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 namehash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
 
         uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
 
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
         assertEq(
@@ -134,17 +162,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testReleaseUsername() public {
         address registrant = testUser;
         string memory username = "releasetest";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 namehash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
-        uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
 
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
 
@@ -180,20 +198,10 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     }
 
     function testSlashSmallUsername() public {
-        string memory smallUsername = "a";
+        string memory username = "a";
 
         address registrant = testUser;
-        bytes32 label = keccak256(abi.encodePacked(smallUsername));
-        bytes32 namehash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
-        uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 123_456;
@@ -203,26 +211,16 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.reserveSlash(secret);
         vm.roll(block.number + 1);
         vm.prank(slasher);
-        usernameRegistrar.slashSmallUsername(smallUsername, reserveSecret);
+        usernameRegistrar.slashSmallUsername(username, reserveSecret);
 
         assertEq(ensRegistry.owner(namehash), address(0), "Username should be slashed and ownership set to zero");
     }
 
     function testSlashAddressLikeUsername() public {
-        string memory addressLikeUsername = "0xc6b95bd261233213";
+        string memory username = "0xc6b95bd261233213";
 
         address registrant = testUser;
-        bytes32 label = keccak256(abi.encodePacked(addressLikeUsername));
-        bytes32 namehash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
-        uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
 
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
@@ -234,7 +232,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.reserveSlash(secret);
 
         vm.roll(block.number + 1);
-        usernameRegistrar.slashAddressLikeUsername(addressLikeUsername, reserveSecret);
+        usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
 
         vm.stopPrank();
         assertEq(ensRegistry.owner(namehash), address(0), "Username should be slashed and ownership set to zero");
@@ -243,19 +241,16 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testRegisterUsernameWithOnlyAddress() public {
         address registrant = testUser;
         string memory username = "bob";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 namehash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
+        (bytes32 label, bytes32 namehash) =
+            registerName(testToken, usernameRegistrar, registrant, username, registrant, bytes32(0), bytes32(0));
         uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
-
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(
+            PublicResolver(ensRegistry.resolver(namehash)).addr(namehash), registrant, "It should resolve an address"
+        );
+        (bytes32 a, bytes32 b) = PublicResolver(ensRegistry.resolver(namehash)).pubkey(namehash);
+        assertEq(a, bytes32(0), "It should not resolve a pubkey a");
+        assertEq(b, bytes32(0), "It should not resolve a pubkey b");
         assertEq(
             usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
         );
@@ -263,25 +258,14 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     }
 
     function testSlashInvalidUsername() public {
-        string memory username = "alic\u00e9";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 usernameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
         address registrant = testUser;
-        uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        string memory username = "alic\u00e9";
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
-        bytes32 secret =
-            keccak256(abi.encodePacked(usernameHash, usernameRegistrar.getCreationTime(label), reserveSecret));
+        bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
         vm.prank(slasher);
         usernameRegistrar.reserveSlash(secret);
@@ -290,114 +274,84 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
 
         assertEq(usernameRegistrar.getAccountBalance(label), 0, "Account balance should be zero after slashing");
-        assertEq(ensRegistry.owner(usernameHash), address(0), "Username should be slashed and ownership set to zero");
+        assertEq(ensRegistry.owner(namehash), address(0), "Username should be slashed and ownership set to zero");
     }
 
     function testShouldNotSlashValidUsername() public {
-        string memory username = "legituser";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 usernameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
         address registrant = testUser;
-        uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        string memory username = "legituser";
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
-        bytes32 secret = keccak256(abi.encodePacked(usernameHash, block.timestamp, reserveSecret));
+        bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
-        vm.prank(slasher);
+        vm.startPrank(slasher);
         usernameRegistrar.reserveSlash(secret);
+        vm.roll(block.number + 1);
 
         vm.expectRevert();
-        vm.prank(slasher);
         usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
+        vm.stopPrank();
     }
 
     function testShouldNotSlashUsernameThatStartsWith0xButIsSmallerThan12() public {
         string memory username = "0xc6b95bd26";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 usernameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
 
         address registrant = testUser;
-        uint256 price = usernameRegistrar.price();
-
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
-        bytes32 secret = keccak256(abi.encodePacked(usernameHash, block.timestamp, reserveSecret));
+        bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
-        vm.prank(slasher);
+        vm.startPrank(slasher);
         usernameRegistrar.reserveSlash(secret);
+        vm.roll(block.number + 1);
 
         vm.expectRevert();
-        vm.prank(slasher);
+
         usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
+        vm.stopPrank();
     }
 
     function testShouldNotSlashUsernameThatDoesNotStartWith0xAndIsBiggerThan12() public {
         string memory username = "0a002322c6b95bd26";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 usernameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
 
         address registrant = testUser;
-        uint256 price = usernameRegistrar.price();
 
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
-        bytes32 secret = keccak256(abi.encodePacked(usernameHash, block.timestamp, reserveSecret));
+        bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
-        vm.prank(slasher);
+        vm.startPrank(slasher);
         usernameRegistrar.reserveSlash(secret);
+        vm.roll(block.number + 1);
 
         vm.expectRevert();
-        vm.prank(slasher);
         usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
+        vm.stopPrank();
     }
 
     function testShouldNotSlashUsernameThatStartsWith0xButDoesNotUseHexChars() public {
         string memory username = "0xprotocolstatus";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        bytes32 usernameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
-
         address registrant = testUser;
-        uint256 price = usernameRegistrar.price();
 
-        testToken.mint(registrant, price);
-        vm.prank(registrant);
-        testToken.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
-        usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
-        bytes32 secret = keccak256(abi.encodePacked(usernameHash, block.timestamp, reserveSecret));
+        bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
-        vm.prank(slasher);
+        vm.startPrank(slasher);
         usernameRegistrar.reserveSlash(secret);
+        vm.roll(block.number + 1);
 
         vm.expectRevert();
-        vm.prank(slasher);
         usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
+        vm.stopPrank();
     }
 }
