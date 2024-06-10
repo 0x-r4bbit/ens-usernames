@@ -43,7 +43,6 @@ contract ENSDependentTest is Test {
             ETH_LABELHASH, deployer);
 
         assert(ensRegistry.owner(ETH_NAMEHASH) == deployer);
-        console.log("ensregistry ", address(ensRegistry));
 
     }
 
@@ -192,22 +191,23 @@ function testRegisterUsername() public {
 
         vm.prank(registrant);
         usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay()/2);
 
         uint256 reserveSecret = 123456;
         address slasher = makeAddr("slasher");
         bytes32 secret = keccak256(
             abi.encodePacked(
-                keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label)),
-                block.timestamp, reserveSecret
+                namehash,
+                usernameRegistrar.getCreationTime(label), reserveSecret
             )
         );
         vm.prank(slasher);
         usernameRegistrar.reserveSlash(secret);
-
+        vm.roll(block.number +1);
         vm.prank(slasher);
         usernameRegistrar.slashSmallUsername(smallUsername, reserveSecret);
 
-        assertEq(ensRegistry.owner(keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label))), address(0), "Username should be slashed and ownership set to zero");
+        assertEq(ensRegistry.owner(namehash), address(0), "Username should be slashed and ownership set to zero");
     }
 
     function testSlashAddressLikeUsername() public {
@@ -225,22 +225,30 @@ function testRegisterUsername() public {
 
         vm.prank(registrant);
         usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay()/2);
+
 
         uint256 reserveSecret = 123456;
         address slasher = makeAddr("slasher");
+        vm.startPrank(slasher);
         bytes32 secret = keccak256(
             abi.encodePacked(
-                keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label)),
-                block.timestamp, reserveSecret
+                namehash,
+                usernameRegistrar.getCreationTime(label),
+                reserveSecret
             )
         );
-        vm.prank(slasher);
+        
         usernameRegistrar.reserveSlash(secret);
+        
 
-        vm.prank(slasher);
+        vm.roll(block.number +1);
         usernameRegistrar.slashAddressLikeUsername(addressLikeUsername, reserveSecret);
 
-        assertEq(ensRegistry.owner(keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label))), address(0), "Username should be slashed and ownership set to zero");
+
+        vm.stopPrank();
+        assertEq(ensRegistry.owner(namehash), address(0), "Username should be slashed and ownership set to zero");
     }
 
     function testRegisterUsernameWithOnlyAddress() public {
@@ -277,14 +285,15 @@ function testRegisterUsername() public {
 
         vm.prank(registrant);
         usernameRegistrar.register(label, registrant, bytes32(0), bytes32(0));
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay()/2);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
-        bytes32 secret = keccak256(abi.encodePacked(usernameHash, block.timestamp, reserveSecret));
+        bytes32 secret = keccak256(abi.encodePacked(usernameHash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
         vm.prank(slasher);
         usernameRegistrar.reserveSlash(secret);
-
+        vm.roll(block.number +1);
         vm.prank(slasher);
         usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
 
