@@ -277,9 +277,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
             registerName(testToken, usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
         uint256 price = usernameRegistrar.price();
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
-        assertEq(
-            address(ensRegistry.resolver(namehash)), address(0), "It shouldnt have a resolver"
-        );
+        assertEq(address(ensRegistry.resolver(namehash)), address(0), "It shouldnt have a resolver");
         assertEq(
             usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
         );
