@@ -15,20 +15,15 @@ import { UpdatedDummy2UsernameRegistrar } from "../contracts/mocks/UpdatedDummy2
 
 contract DeployTest is BaseScript {
     DeploymentTestConfig deploymentTestConfig;
-        TestToken token;
-        ENSRegistry ensRegistry;
-        PublicResolver publicResolver;
+    TestToken token;
+    ENSRegistry ensRegistry;
+    PublicResolver publicResolver;
+
     constructor() {
         deploymentTestConfig = new DeploymentTestConfig(broadcaster);
     }
 
-
-    function run() public returns (
-        TestToken, 
-        ENSRegistry, 
-        PublicResolver,
-        DeploymentTestConfig
-    ) {
+    function run() public returns (TestToken, ENSRegistry, PublicResolver, DeploymentTestConfig) {
         DeploymentTestConfig.NetworkConfig memory config = deploymentTestConfig.activeNetworkConfig();
 
         vm.startBroadcast(broadcaster);
@@ -37,20 +32,10 @@ contract DeployTest is BaseScript {
         publicResolver = new PublicResolver(ensRegistry);
         vm.stopBroadcast();
 
-        return (
-            token,
-            ensRegistry,
-            publicResolver,
-            deploymentTestConfig
-        );
+        return (token, ensRegistry, publicResolver, deploymentTestConfig);
     }
 
-
-    function deployRegistry() public returns (
-        UsernameRegistrar,
-        UpdatedUsernameRegistrar,
-        DeploymentTestConfig
-    ) {
+    function deployRegistry() public returns (UsernameRegistrar, UpdatedUsernameRegistrar, DeploymentTestConfig) {
         DeploymentTestConfig.NetworkConfig memory config = deploymentTestConfig.activeNetworkConfig();
 
         vm.startBroadcast(broadcaster);
@@ -75,20 +60,13 @@ contract DeployTest is BaseScript {
         );
         vm.stopBroadcast();
 
-        return (
-            usernameRegistrar,
-            updatedUsernameRegistrar,
-            deploymentTestConfig
-        );
+        return (usernameRegistrar, updatedUsernameRegistrar, deploymentTestConfig);
     }
 
-
-
-    function deployDummy() public returns (
-        DummyUsernameRegistrar, 
-        UpdatedDummyUsernameRegistrar,
-        DeploymentTestConfig
-    ) {
+    function deployDummy()
+        public
+        returns (DummyUsernameRegistrar, UpdatedDummyUsernameRegistrar, DeploymentTestConfig)
+    {
         DeploymentTestConfig.NetworkConfig memory config = deploymentTestConfig.activeNetworkConfig();
 
         vm.startBroadcast(broadcaster);
@@ -114,18 +92,10 @@ contract DeployTest is BaseScript {
         );
         vm.stopBroadcast();
 
-        return (
-            dummyUsernameRegistrar,
-            updatedDummyUsernameRegistrar,
-            deploymentTestConfig
-        );
+        return (dummyUsernameRegistrar, updatedDummyUsernameRegistrar, deploymentTestConfig);
     }
 
-
-    function deployDummy2() public returns (
-        Dummy2UsernameRegistrar, 
-        UpdatedDummy2UsernameRegistrar
-    ) {
+    function deployDummy2() public returns (Dummy2UsernameRegistrar, UpdatedDummy2UsernameRegistrar) {
         DeploymentTestConfig.NetworkConfig memory config = deploymentTestConfig.activeNetworkConfig();
 
         vm.startBroadcast(broadcaster);
@@ -152,9 +122,6 @@ contract DeployTest is BaseScript {
 
         vm.stopBroadcast();
 
-        return (
-            dummy2UsernameRegistrar,
-            updatedDummy2UsernameRegistrar
-        );
+        return (dummy2UsernameRegistrar, updatedDummy2UsernameRegistrar);
     }
 }

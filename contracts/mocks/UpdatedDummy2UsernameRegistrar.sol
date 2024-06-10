@@ -5,7 +5,6 @@ pragma solidity 0.8.19;
 import "./Dummy2UsernameRegistrar.sol";
 
 contract UpdatedDummy2UsernameRegistrar is Dummy2UsernameRegistrar {
-
     constructor(
         ERC20Token _token,
         ENS _ensRegistry,
@@ -24,8 +23,5 @@ contract UpdatedDummy2UsernameRegistrar is Dummy2UsernameRegistrar {
             _reservedUsernamesMerkleRoot,
             _parentRegistry
         )
-    {
-
-    }
-
+    { }
 }

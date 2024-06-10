@@ -17,7 +17,7 @@ library MerkleTree {
     function getLayers(bytes32[] memory elements) internal pure returns (bytes32[][] memory) {
         if (elements.length == 0) {
             bytes32[][] memory empty = new bytes32[][](1);
-            empty ;
+            empty;
             return empty;
         }
 
@@ -58,7 +58,7 @@ library MerkleTree {
 
     function getProof(bytes32[] memory elements, bytes32 element) internal pure returns (bytes32[] memory) {
         uint256 index = indexOf(elements, element);
-        if(index == type(uint256).max){
+        if (index == type(uint256).max) {
             revert ElementDoesNotExist();
         }
 

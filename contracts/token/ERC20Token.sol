@@ -6,7 +6,6 @@ pragma solidity 0.8.19;
 // https://github.com/ethereum/EIPs/issues/20
 
 interface ERC20Token {
-
     /**
      * @notice send `_value` token to `_to` from `msg.sender`
      * @param _to The address of the recipient

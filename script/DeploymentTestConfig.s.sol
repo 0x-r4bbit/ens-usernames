@@ -6,6 +6,7 @@ import { Script } from "forge-std/Script.sol";
 contract DeploymentTestConfig is Script {
     error DeploymentConfig_InvalidDeployerAddress();
     error DeploymentConfig_NoConfigForChain(uint256);
+
     bytes32 constant ETH_LABELHASH = keccak256("eth");
     bytes32 constant ETH_NAMEHASH = keccak256(abi.encodePacked(bytes32(0x0), ETH_LABELHASH));
 
@@ -39,13 +40,14 @@ contract DeploymentTestConfig is Script {
         }
         if (_broadcaster == address(0)) revert DeploymentConfig_InvalidDeployerAddress();
     }
-    
+
     function activeNetworkConfig() public view returns (NetworkConfig memory) {
         return activeNetworkConfig_;
     }
 
     function getOrCreateAnvilEthConfig(address _deployer) public pure returns (NetworkConfig memory) {
-        bytes32 reservedUsernamesMerkleRoot = 0xb46e19581b371ab0856ee8ffd05b33cbfd264755e18f2d004780bb929970a53e ; // Replace with actual merkle root
+        bytes32 reservedUsernamesMerkleRoot = 0xb46e19581b371ab0856ee8ffd05b33cbfd264755e18f2d004780bb929970a53e; // Replace
+            // with actual merkle root
 
         RegistryConfig memory registry = RegistryConfig({
             name: "stateofus",
