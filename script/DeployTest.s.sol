@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.8.19 <=0.9.0;
+pragma solidity >=0.8.25 <=0.9.0;
 
 import { BaseScript } from "./Base.s.sol";
 import { DeploymentTestConfig } from "./DeploymentTestConfig.s.sol";
@@ -8,10 +8,6 @@ import { ENSRegistry } from "../contracts/ens/ENSRegistry.sol";
 import { PublicResolver } from "../contracts/ens/PublicResolver.sol";
 import { UsernameRegistrar } from "../contracts/registry/UsernameRegistrar.sol";
 import { UpdatedUsernameRegistrar } from "../contracts/mocks/UpdatedUsernameRegistrar.sol";
-import { DummyUsernameRegistrar } from "../contracts/mocks/DummyUsernameRegistrar.sol";
-import { UpdatedDummyUsernameRegistrar } from "../contracts/mocks/UpdatedDummyUsernameRegistrar.sol";
-import { Dummy2UsernameRegistrar } from "../contracts/mocks/Dummy2UsernameRegistrar.sol";
-import { UpdatedDummy2UsernameRegistrar } from "../contracts/mocks/UpdatedDummy2UsernameRegistrar.sol";
 
 contract DeployTest is BaseScript {
     DeploymentTestConfig deploymentTestConfig;
@@ -61,67 +57,5 @@ contract DeployTest is BaseScript {
         vm.stopBroadcast();
 
         return (usernameRegistrar, updatedUsernameRegistrar, deploymentTestConfig);
-    }
-
-    function deployDummy()
-        public
-        returns (DummyUsernameRegistrar, UpdatedDummyUsernameRegistrar, DeploymentTestConfig)
-    {
-        DeploymentTestConfig.NetworkConfig memory config = deploymentTestConfig.activeNetworkConfig();
-
-        vm.startBroadcast(broadcaster);
-
-        DummyUsernameRegistrar dummyUsernameRegistrar = new DummyUsernameRegistrar(
-            token,
-            ensRegistry,
-            publicResolver,
-            config.dummyRegistry.namehash,
-            config.usernameMinLength,
-            config.reservedUsernamesMerkleRoot,
-            address(0)
-        );
-
-        UpdatedDummyUsernameRegistrar updatedDummyUsernameRegistrar = new UpdatedDummyUsernameRegistrar(
-            token,
-            ensRegistry,
-            publicResolver,
-            config.dummyRegistry.namehash,
-            config.usernameMinLength,
-            config.reservedUsernamesMerkleRoot,
-            address(dummyUsernameRegistrar)
-        );
-        vm.stopBroadcast();
-
-        return (dummyUsernameRegistrar, updatedDummyUsernameRegistrar, deploymentTestConfig);
-    }
-
-    function deployDummy2() public returns (Dummy2UsernameRegistrar, UpdatedDummy2UsernameRegistrar) {
-        DeploymentTestConfig.NetworkConfig memory config = deploymentTestConfig.activeNetworkConfig();
-
-        vm.startBroadcast(broadcaster);
-
-        Dummy2UsernameRegistrar dummy2UsernameRegistrar = new Dummy2UsernameRegistrar(
-            token,
-            ensRegistry,
-            publicResolver,
-            config.dummy2Registry.namehash,
-            config.usernameMinLength,
-            config.reservedUsernamesMerkleRoot,
-            address(0)
-        );
-
-        UpdatedDummy2UsernameRegistrar updatedDummy2UsernameRegistrar = new UpdatedDummy2UsernameRegistrar(
-            token,
-            ensRegistry,
-            publicResolver,
-            config.dummy2Registry.namehash,
-            config.usernameMinLength,
-            config.reservedUsernamesMerkleRoot,
-            address(dummy2UsernameRegistrar)
-        );
-
-        vm.stopBroadcast();
-
-        return (dummy2UsernameRegistrar, updatedDummy2UsernameRegistrar);
     }
 }

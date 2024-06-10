@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.25;
 
 import { Test, console } from "forge-std/Test.sol";
 import { DeployTest } from "../script/DeployTest.s.sol";
 import { DeploymentTestConfig } from "../script/DeploymentTestConfig.s.sol";
+import { ENS } from "../contracts/ens/ENS.sol";
+import { ERC20Token } from "../contracts/token/ERC20Token.sol";
 import { TestToken } from "../contracts/token/TestToken.sol";
 import { ENSRegistry } from "../contracts/ens/ENSRegistry.sol";
 import { PublicResolver } from "../contracts/ens/PublicResolver.sol";
 import { UsernameRegistrar } from "../contracts/registry/UsernameRegistrar.sol";
 import { UpdatedUsernameRegistrar } from "../contracts/mocks/UpdatedUsernameRegistrar.sol";
-import { DummyUsernameRegistrar } from "../contracts/mocks/DummyUsernameRegistrar.sol";
+/*import { DummyUsernameRegistrar } from "../contracts/mocks/DummyUsernameRegistrar.sol";
 import { UpdatedDummyUsernameRegistrar } from "../contracts/mocks/UpdatedDummyUsernameRegistrar.sol";
 import { Dummy2UsernameRegistrar } from "../contracts/mocks/Dummy2UsernameRegistrar.sol";
-import { UpdatedDummy2UsernameRegistrar } from "../contracts/mocks/UpdatedDummy2UsernameRegistrar.sol";
+import { UpdatedDummy2UsernameRegistrar } from "../contracts/mocks/UpdatedDummy2UsernameRegistrar.sol";*/
 
 contract ENSDependentTest is Test {
     bytes32 constant ETH_LABELHASH = keccak256("eth");
-    bytes32 constant ETH_NAMEHASH = keccak256(abi.encodePacked(bytes32(0x0), ETH_LABELHASH));
+    bytes32 immutable ETH_NAMEHASH = getNameHash(bytes32(0x0), ETH_LABELHASH);
     DeploymentTestConfig public deploymentConfig;
     TestToken public testToken;
     ENSRegistry public ensRegistry;
@@ -38,6 +40,10 @@ contract ENSDependentTest is Test {
         assert(ensRegistry.owner(ETH_NAMEHASH) == deployer);
     }
 
+    function getNameHash(bytes32 domain, bytes32 subdomain) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(domain, subdomain));
+    }
+
     function registerName(
         TestToken token,
         UsernameRegistrar usernameRegistrar,
@@ -51,15 +57,14 @@ contract ENSDependentTest is Test {
         returns (bytes32 label, bytes32 nameHash)
     {
         label = keccak256(abi.encodePacked(username));
-        nameHash = keccak256(abi.encodePacked(usernameRegistrar.ensNode(), label));
+        nameHash = getNameHash(usernameRegistrar.ensNode(), label);
         uint256 price = usernameRegistrar.price();
 
         token.mint(registrant, price);
-        vm.prank(registrant);
+        vm.startPrank(registrant);
         token.approve(address(usernameRegistrar), price);
-
-        vm.prank(registrant);
         usernameRegistrar.register(label, account, pubkeyA, pubkeyB);
+        vm.stopPrank();
     }
 
     function registerName(
@@ -72,6 +77,35 @@ contract ENSDependentTest is Test {
         returns (bytes32 label, bytes32 nameHash)
     {
         return registerName(token, usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
+    }
+
+    function generateXY(bytes memory pub) internal pure returns (bytes32, bytes32) {
+        require(pub.length == 65, "Invalid public key length");
+        // First byte should be 0x04
+        require(uint8(pub[0]) == 0x04, "Invalid public key format");
+
+        bytes32 x;
+        bytes32 y;
+
+        // Load X and Y coordinates from the public key
+        assembly {
+            x := mload(add(pub, 0x21))
+            y := mload(add(pub, 0x41))
+        }
+
+        return (x, y);
+    }
+
+    function keyFromXY(bytes32 x, bytes32 y) internal pure returns (bytes memory) {
+        bytes memory publicKey = new bytes(65);
+        publicKey[0] = bytes1(0x04);
+
+        assembly {
+            mstore(add(publicKey, 0x21), x)
+            mstore(add(publicKey, 0x41), y)
+        }
+
+        return publicKey;
     }
 }
 
@@ -136,9 +170,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         (usernameRegistrar, updatedUsernameRegistrar,) = deployment.deployRegistry();
         bytes32 label = deploymentConfig.activeNetworkConfig().registry.label;
         vm.prank(deployer);
-        ensRegistry.setSubnodeOwner(
-            0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae, label, address(usernameRegistrar)
-        );
+        ensRegistry.setSubnodeOwner(ETH_NAMEHASH, label, address(usernameRegistrar));
 
         uint256 initialPrice = 1000;
         vm.prank(deployer);
@@ -238,6 +270,22 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         assertEq(ensRegistry.owner(namehash), address(0), "Username should be slashed and ownership set to zero");
     }
 
+    function testRegisterUsernameWithoutAnything() public {
+        address registrant = testUser;
+        string memory username = "bob";
+        (bytes32 label, bytes32 namehash) =
+            registerName(testToken, usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
+        uint256 price = usernameRegistrar.price();
+        assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(
+            address(ensRegistry.resolver(namehash)), address(0), "It shouldnt have a resolver"
+        );
+        assertEq(
+            usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
+        );
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
     function testRegisterUsernameWithOnlyAddress() public {
         address registrant = testUser;
         string memory username = "bob";
@@ -255,6 +303,79 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
             usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
         );
         assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
+    function testRegisterUsernameWithOnlyPubkey() public {
+        address registrant = testUser;
+        string memory username = "bob";
+        bytes memory contactCode =
+            hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
+
+        (bytes32 x, bytes32 y) = generateXY(contactCode);
+
+        (bytes32 label, bytes32 namehash) =
+            registerName(testToken, usernameRegistrar, registrant, username, address(0), x, y);
+        uint256 price = usernameRegistrar.price();
+        assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(
+            PublicResolver(ensRegistry.resolver(namehash)).addr(namehash), address(0), "It should resolve an address"
+        );
+        (bytes32 resX, bytes32 resY) = PublicResolver(ensRegistry.resolver(namehash)).pubkey(namehash);
+        assertEq(keccak256(abi.encodePacked(resX, resY)), keccak256(abi.encodePacked(x, y)), "Pubkey does not match");
+        assertEq(
+            usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
+        );
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
+    function testRegisterUsernameWithAccountAndPubKey() public {
+        address registrant = testUser;
+        address account = makeAddr("account");
+        string memory username = "bob2";
+        bytes32 label = keccak256(abi.encodePacked(username));
+        uint256 registryPrice = usernameRegistrar.price();
+        bytes32 usernameHash = getNameHash(usernameRegistrar.ensNode(), label);
+        bytes memory contactCode =
+            hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
+
+        (bytes32 x, bytes32 y) = generateXY(contactCode);
+        testToken.mint(registrant, registryPrice);
+        vm.startPrank(registrant);
+
+        vm.expectEmit(true, true, true, true, address(testToken));
+        emit ERC20Token.Approval(registrant, address(usernameRegistrar), registryPrice);
+        vm.expectEmit(true, true, true, true, address(testToken));
+        emit ERC20Token.Transfer(registrant, address(usernameRegistrar), registryPrice);
+        vm.expectEmit(true, true, true, true, address(ensRegistry));
+        emit ENS.NewOwner(usernameRegistrar.ensNode(), label, address(usernameRegistrar));
+        vm.expectEmit(true, true, true, true, address(ensRegistry));
+        emit ENS.NewResolver(usernameHash, address(publicResolver));
+        vm.expectEmit(true, true, true, true, address(publicResolver));
+        emit PublicResolver.AddrChanged(usernameHash, account);
+        vm.expectEmit(true, true, true, true, address(publicResolver));
+        emit PublicResolver.PubkeyChanged(usernameHash, x, y);
+        vm.expectEmit(true, true, true, true, address(ensRegistry));
+        emit ENS.Transfer(usernameHash, registrant);
+
+        testToken.approveAndCall(
+            address(usernameRegistrar),
+            registryPrice,
+            abi.encodePacked(UsernameRegistrar.register.selector, abi.encode(label, account, x, y))
+        );
+
+        vm.stopPrank();
+
+        // Assert results
+        assertEq(ensRegistry.owner(usernameHash), registrant, "ENSRegistry owner mismatch");
+        assertEq(ensRegistry.resolver(usernameHash), address(publicResolver), "Resolver wrongly defined");
+        assertEq(usernameRegistrar.getAccountBalance(label), registryPrice, "Wrong account balance");
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch");
+        assertEq(publicResolver.addr(usernameHash), account, "Resolved address not set");
+
+        (bytes32 resX, bytes32 resY) = publicResolver.pubkey(usernameHash);
+        bytes memory resContactCode = keyFromXY(resX, resY);
+        assertEq(keccak256(abi.encodePacked(resX, resY)), keccak256(abi.encodePacked(x, y)), "Pubkey does not match");
+        assertEq(keccak256(resContactCode), keccak256(contactCode), "Contact code does not match");
     }
 
     function testSlashInvalidUsername() public {
