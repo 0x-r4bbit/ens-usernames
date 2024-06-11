@@ -410,6 +410,46 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         assertEq(updatedUsernameRegistrar.price(), usernameRegistrar.price(), "Moved registry didn't retrieve price");
     }
 
+    function testUpdateAccountOwner() public {
+        address registrant = testUser;
+        address newUser = makeAddr("newUser");
+        string memory username = "testuser";
+
+        bytes32 ensNode = usernameRegistrar.ensNode();
+        bytes32 impossibleCase = keccak256("anyname");
+
+        vm.prank(address(usernameRegistrar));
+        ensRegistry.setSubnodeOwner(ensNode, impossibleCase, registrant);
+
+        vm.prank(registrant);
+        vm.expectRevert("Username not registered.");
+        usernameRegistrar.updateAccountOwner(impossibleCase);
+
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.prank(registrant);
+        ensRegistry.setOwner(namehash, newUser);
+
+        vm.prank(registrant);
+        vm.expectRevert("Caller not owner of ENS node.");
+        usernameRegistrar.updateAccountOwner(label);
+
+        vm.prank(newUser);
+        usernameRegistrar.updateAccountOwner(label);
+
+        assertEq(usernameRegistrar.getAccountOwner(label), newUser, "Account owner should be updated");
+
+        vm.prank(deployer);
+        usernameRegistrar.moveRegistry(updatedUsernameRegistrar);
+
+        vm.prank(newUser);
+        ensRegistry.setOwner(namehash, registrant);
+
+        vm.prank(registrant);
+        vm.expectRevert("Registry not owner of registry.");
+        usernameRegistrar.updateAccountOwner(label);
+    }
+
     function testSlashSmallUsername() public {
         string memory username = "a";
 

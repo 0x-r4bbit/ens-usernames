@@ -3,11 +3,11 @@
 | Deployment Cost                                    | Deployment Size |       |        |       |         |
 | 707068                                             | 3509            |       |        |       |         |
 | Function Name                                      | min             | avg   | median | max   | # calls |
-| owner                                              | 532             | 913   | 532    | 2532  | 131     |
+| owner                                              | 532             | 898   | 532    | 2532  | 142     |
 | resolver                                           | 475             | 808   | 475    | 2475  | 12      |
-| setOwner                                           | 2310            | 2776  | 2310   | 5110  | 18      |
+| setOwner                                           | 2310            | 2843  | 2310   | 5110  | 21      |
 | setResolver                                        | 4371            | 13555 | 4371   | 24271 | 13      |
-| setSubnodeOwner                                    | 2984            | 23307 | 24884  | 26884 | 96      |
+| setSubnodeOwner                                    | 2984            | 23371 | 24884  | 26884 | 100     |
 
 
 | contracts/ens/PublicResolver.sol:PublicResolver contract |                 |       |        |       |         |
@@ -26,20 +26,20 @@
 | Deployment Cost                                                              | Deployment Size |        |        |        |         |
 | 4075224                                                                      | 20524           |        |        |        |         |
 | Function Name                                                                | min             | avg    | median | max    | # calls |
-| activate                                                                     | 46280           | 46555  | 46280  | 54280  | 29      |
+| activate                                                                     | 46280           | 46546  | 46280  | 54280  | 30      |
 | controller                                                                   | 2392            | 2392   | 2392   | 2392   | 1       |
 | dropUsername                                                                 | 14171           | 14171  | 14171  | 14171  | 2       |
-| ensNode                                                                      | 384             | 1384   | 1384   | 2384   | 50      |
+| ensNode                                                                      | 384             | 1365   | 384    | 2384   | 53      |
 | ensRegistry                                                                  | 2438            | 2438   | 2438   | 2438   | 1       |
 | getAccountBalance                                                            | 527             | 527    | 527    | 527    | 15      |
-| getAccountOwner                                                              | 540             | 540    | 540    | 540    | 14      |
+| getAccountOwner                                                              | 540             | 540    | 540    | 540    | 15      |
 | getCreationTime                                                              | 512             | 512    | 512    | 512    | 7       |
-| migrateRegistry                                                              | 54281           | 54281  | 54281  | 54281  | 3       |
-| moveRegistry                                                                 | 72002           | 76168  | 72002  | 84502  | 3       |
+| migrateRegistry                                                              | 54281           | 54281  | 54281  | 54281  | 4       |
+| moveRegistry                                                                 | 72002           | 75127  | 72002  | 84502  | 4       |
 | parentRegistry                                                               | 2393            | 2393   | 2393   | 2393   | 1       |
-| price                                                                        | 385             | 1648   | 2385   | 2385   | 38      |
+| price                                                                        | 385             | 1667   | 2385   | 2385   | 39      |
 | receiveApproval                                                              | 158006          | 207941 | 217778 | 265748 | 5       |
-| register                                                                     | 157183          | 170323 | 157183 | 264925 | 19      |
+| register                                                                     | 152683          | 169441 | 157183 | 264925 | 20      |
 | release                                                                      | 1420            | 20553  | 7198   | 43479  | 9       |
 | releaseDelay                                                                 | 285             | 285    | 285    | 285    | 11      |
 | reserveSlash                                                                 | 44801           | 44801  | 44801  | 44801  | 7       |
@@ -50,6 +50,7 @@
 | slashSmallUsername                                                           | 45098           | 45098  | 45098  | 45098  | 1       |
 | state                                                                        | 419             | 419    | 419    | 419    | 2       |
 | token                                                                        | 2436            | 2436   | 2436   | 2436   | 1       |
+| updateAccountOwner                                                           | 1850            | 4009   | 4073   | 6039   | 4       |
 | updateRegistryPrice                                                          | 10652           | 10652  | 10652  | 10652  | 1       |
 | usernameMinLength                                                            | 2364            | 2364   | 2364   | 2364   | 1       |
 
@@ -67,12 +68,12 @@
 | Deployment Cost                                  | Deployment Size |        |        |        |         |
 | 455093                                           | 2304            |        |        |        |         |
 | Function Name                                    | min             | avg    | median | max    | # calls |
-| allowance                                        | 756             | 756    | 756    | 756    | 24      |
-| approve                                          | 24705           | 24705  | 24705  | 24705  | 19      |
+| allowance                                        | 756             | 756    | 756    | 756    | 25      |
+| approve                                          | 24705           | 24705  | 24705  | 24705  | 20      |
 | approveAndCall                                   | 183547          | 233482 | 243319 | 291289 | 5       |
-| mint                                             | 46724           | 46724  | 46724  | 46724  | 24      |
+| mint                                             | 46724           | 46724  | 46724  | 46724  | 25      |
 | transfer                                         | 23213           | 24355  | 25213  | 25213  | 7       |
-| transferFrom                                     | 26302           | 26302  | 26302  | 26302  | 24      |
+| transferFrom                                     | 26302           | 26302  | 26302  | 26302  | 25      |
 
 
 | script/DeployTest.s.sol:DeployTest contract |                 |         |         |         |         |
@@ -80,8 +81,8 @@
 | Deployment Cost                             | Deployment Size |         |         |         |         |
 | 12784447                                    | 64428           |         |         |         |         |
 | Function Name                               | min             | avg     | median  | max     | # calls |
-| deployRegistry                              | 8217805         | 8217805 | 8217805 | 8217805 | 34      |
-| run                                         | 2993557         | 2993557 | 2993557 | 2993557 | 36      |
+| deployRegistry                              | 8217805         | 8217805 | 8217805 | 8217805 | 35      |
+| run                                         | 2993557         | 2993557 | 2993557 | 2993557 | 37      |
 
 
 | script/DeploymentTestConfig.s.sol:DeploymentTestConfig contract |                 |      |        |       |         |
@@ -89,7 +90,7 @@
 | Deployment Cost                                                 | Deployment Size |      |        |       |         |
 | 1094584                                                         | 5119            |      |        |       |         |
 | Function Name                                                   | min             | avg  | median | max   | # calls |
-| activeNetworkConfig                                             | 9274            | 9795 | 9274   | 45274 | 138     |
+| activeNetworkConfig                                             | 9274            | 9781 | 9274   | 45274 | 142     |
 
 
 
