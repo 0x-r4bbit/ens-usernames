@@ -71,11 +71,15 @@ contract ENSDependentTest is Test {
         uint256 price = usernameRegistrar.price();
         if(price > 0) {
             testToken.mint(registrant, price);
-            vm.prank(registrant);
-            if(!approveAndCall)
+            vm.expectEmit(true, true, true, true, address(testToken));
+            emit ERC20Token.Approval(registrant, address(usernameRegistrar), price);
+            if(!approveAndCall){
+                vm.prank(registrant);
                 testToken.approve(address(usernameRegistrar), price);
+            }
+                
         }
-
+        
         vm.expectEmit(true, true, true, true, address(testToken));
         emit ERC20Token.Transfer(registrant, address(usernameRegistrar), price);
         if(account != address(0) || pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
@@ -124,6 +128,18 @@ contract ENSDependentTest is Test {
         returns (bytes32 label, bytes32 nameHash)
     {
         return registerName(usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
+    }
+
+    function registerName(
+        UsernameRegistrar usernameRegistrar,
+        address registrant,
+        string memory username,
+        bool approveAndCall
+    )
+        internal
+        returns (bytes32 label, bytes32 nameHash)
+    {
+        return registerName(usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0), approveAndCall);
     }
 
     function generateXY(bytes memory pub) internal pure returns (bytes32, bytes32) {
@@ -238,6 +254,20 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
     }
 
+    function testRegisterUsernameApproveAndCall() public {
+        address registrant = testUser;
+        string memory username = "testuser";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username, true);
+
+        uint256 price = usernameRegistrar.price();
+
+        assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(
+            usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
+        );
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
     function testReleaseUsername() public {
         address registrant = testUser;
         string memory username = "releasetest";
@@ -331,11 +361,44 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
     }
 
+    function testRegisterUsernameWithoutAnythingApproveAndCall() public {
+        address registrant = testUser;
+        string memory username = "bob";
+        (bytes32 label, bytes32 namehash) =
+            registerName(usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0), true);
+        uint256 price = usernameRegistrar.price();
+        assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(address(ensRegistry.resolver(namehash)), address(0), "It shouldnt have a resolver");
+        assertEq(
+            usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
+        );
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
     function testRegisterUsernameWithOnlyAddress() public {
         address registrant = testUser;
         string memory username = "bob";
         (bytes32 label, bytes32 namehash) =
             registerName(usernameRegistrar, registrant, username, registrant, bytes32(0), bytes32(0));
+        uint256 price = usernameRegistrar.price();
+        assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(
+            PublicResolver(ensRegistry.resolver(namehash)).addr(namehash), registrant, "It should resolve an address"
+        );
+        (bytes32 a, bytes32 b) = PublicResolver(ensRegistry.resolver(namehash)).pubkey(namehash);
+        assertEq(a, bytes32(0), "It should not resolve a pubkey a");
+        assertEq(b, bytes32(0), "It should not resolve a pubkey b");
+        assertEq(
+            usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
+        );
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
+    function testRegisterUsernameWithOnlyAddressApproveAndCall() public {
+        address registrant = testUser;
+        string memory username = "bob";
+        (bytes32 label, bytes32 namehash) =
+            registerName(usernameRegistrar, registrant, username, registrant, bytes32(0), bytes32(0), true);
         uint256 price = usernameRegistrar.price();
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
         assertEq(
@@ -373,6 +436,29 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
     }
 
+    function testRegisterUsernameWithOnlyPubkeyApproveAndCall() public {
+        address registrant = testUser;
+        string memory username = "bob";
+        bytes memory contactCode =
+            hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
+
+        (bytes32 x, bytes32 y) = generateXY(contactCode);
+
+        (bytes32 label, bytes32 namehash) =
+            registerName(usernameRegistrar, registrant, username, address(0), x, y, true);
+        uint256 price = usernameRegistrar.price();
+        assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
+        assertEq(
+            PublicResolver(ensRegistry.resolver(namehash)).addr(namehash), address(0), "It should resolve an address"
+        );
+        (bytes32 resX, bytes32 resY) = PublicResolver(ensRegistry.resolver(namehash)).pubkey(namehash);
+        assertEq(keccak256(abi.encodePacked(resX, resY)), keccak256(abi.encodePacked(x, y)), "Pubkey does not match");
+        assertEq(
+            usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
+        );
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
     function testRegisterUsernameWithAccountAndPubKey() public {
         address registrant = testUser;
         address account = makeAddr("account");
@@ -384,6 +470,30 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         (bytes32 x, bytes32 y) = generateXY(contactCode);
 
         (bytes32 label, bytes32 usernameHash) = registerName(usernameRegistrar, registrant, username, account, x, y);
+        // Assert results
+        assertEq(ensRegistry.owner(usernameHash), registrant, "ENSRegistry owner mismatch");
+        assertEq(ensRegistry.resolver(usernameHash), address(publicResolver), "Resolver wrongly defined");
+        assertEq(usernameRegistrar.getAccountBalance(label), usernameRegistrar.price(), "Wrong account balance");
+        assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch");
+        assertEq(publicResolver.addr(usernameHash), account, "Resolved address not set");
+
+        (bytes32 resX, bytes32 resY) = publicResolver.pubkey(usernameHash);
+        bytes memory resContactCode = keyFromXY(resX, resY);
+        assertEq(keccak256(abi.encodePacked(resX, resY)), keccak256(abi.encodePacked(x, y)), "Pubkey does not match");
+        assertEq(keccak256(resContactCode), keccak256(contactCode), "Contact code does not match");
+    }
+
+    function testRegisterUsernameWithAccountAndPubKeyApproveAndCall() public {
+        address registrant = testUser;
+        address account = makeAddr("account");
+        string memory username = "bob2";
+        
+        
+        bytes memory contactCode =
+            hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
+        (bytes32 x, bytes32 y) = generateXY(contactCode);
+
+        (bytes32 label, bytes32 usernameHash) = registerName(usernameRegistrar, registrant, username, account, x, y, true);
         // Assert results
         assertEq(ensRegistry.owner(usernameHash), registrant, "ENSRegistry owner mismatch");
         assertEq(ensRegistry.resolver(usernameHash), address(publicResolver), "Resolver wrongly defined");
