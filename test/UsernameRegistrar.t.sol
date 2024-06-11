@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.25;
 
-import { Test, console } from "forge-std/Test.sol";
+import { Test, console, stdError } from "forge-std/Test.sol";
 import { DeployTest } from "../script/DeployTest.s.sol";
 import { DeploymentTestConfig } from "../script/DeploymentTestConfig.s.sol";
 import { ENS } from "../contracts/ens/ENS.sol";
@@ -653,15 +653,39 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         address registrant = testUser;
         string memory username = "alic\u00e9";
         (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
-        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
+
+        vm.prank(slasher);
+        vm.expectRevert(stdError.assertionError);
+        usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
+
         bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
 
         vm.prank(slasher);
+        vm.expectRevert("Not reserved.");
+        usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
+
+        vm.prank(slasher);
         usernameRegistrar.reserveSlash(secret);
+
+        vm.prank(slasher);
+        vm.expectRevert("Cannot reveal in same block");
+        usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
+
         vm.roll(block.number + 1);
+
+        vm.prank(slasher);
+        vm.expectRevert("Not invalid character.");
+        usernameRegistrar.slashInvalidUsername(username, 2, reserveSecret);
+
+        vm.prank(slasher);
+        vm.expectRevert("Invalid position.");
+        usernameRegistrar.slashInvalidUsername(username, 12, reserveSecret);
+
         vm.prank(slasher);
         usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
 
@@ -683,7 +707,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.reserveSlash(secret);
         vm.roll(block.number + 1);
 
-        vm.expectRevert();
+        vm.expectRevert("Not invalid character.");
         usernameRegistrar.slashInvalidUsername(username, 4, reserveSecret);
         vm.stopPrank();
     }
@@ -702,7 +726,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.reserveSlash(secret);
         vm.roll(block.number + 1);
 
-        vm.expectRevert();
+        vm.expectRevert("Too small to look like an address.");
 
         usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
         vm.stopPrank();
@@ -723,7 +747,27 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.reserveSlash(secret);
         vm.roll(block.number + 1);
 
-        vm.expectRevert();
+        vm.expectRevert("Second character need to be x");
+        usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
+        vm.stopPrank();
+    }
+
+    function testShouldNotSlashUsernameThatDoesNotStartWith0AndIsBiggerThan12() public {
+        string memory username = "Ox002322c6b95bd26";
+
+        address registrant = testUser;
+
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        uint256 reserveSecret = 1337;
+        address slasher = makeAddr("slasher");
+        bytes32 secret = keccak256(abi.encodePacked(namehash, usernameRegistrar.getCreationTime(label), reserveSecret));
+
+        vm.startPrank(slasher);
+        usernameRegistrar.reserveSlash(secret);
+        vm.roll(block.number + 1);
+
+        vm.expectRevert("First character need to be 0");
         usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
         vm.stopPrank();
     }
@@ -742,7 +786,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         usernameRegistrar.reserveSlash(secret);
         vm.roll(block.number + 1);
 
-        vm.expectRevert();
+        vm.expectRevert("Does not look like an address");
         usernameRegistrar.slashAddressLikeUsername(username, reserveSecret);
         vm.stopPrank();
     }
