@@ -45,13 +45,23 @@ contract ENSDependentTest is Test {
     }
 
     function registerName(
-        TestToken token,
         UsernameRegistrar usernameRegistrar,
         address registrant,
         string memory username,
         address account,
         bytes32 pubkeyA,
         bytes32 pubkeyB
+    ) internal returns (bytes32 label, bytes32 nameHash) {
+        return registerName(usernameRegistrar, registrant, username, account, pubkeyA, pubkeyB, false);
+    }
+    function registerName(
+        UsernameRegistrar usernameRegistrar,
+        address registrant,
+        string memory username,
+        address account,
+        bytes32 pubkeyA,
+        bytes32 pubkeyB,
+        bool approveAndCall
     )
         internal
         returns (bytes32 label, bytes32 nameHash)
@@ -59,16 +69,53 @@ contract ENSDependentTest is Test {
         label = keccak256(abi.encodePacked(username));
         nameHash = getNameHash(usernameRegistrar.ensNode(), label);
         uint256 price = usernameRegistrar.price();
+        if(price > 0) {
+            testToken.mint(registrant, price);
+            vm.prank(registrant);
+            if(!approveAndCall)
+                testToken.approve(address(usernameRegistrar), price);
+        }
 
-        token.mint(registrant, price);
-        vm.startPrank(registrant);
-        token.approve(address(usernameRegistrar), price);
-        usernameRegistrar.register(label, account, pubkeyA, pubkeyB);
-        vm.stopPrank();
+        vm.expectEmit(true, true, true, true, address(testToken));
+        emit ERC20Token.Transfer(registrant, address(usernameRegistrar), price);
+        if(account != address(0) || pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
+            vm.expectEmit(true, true, true, true, address(ensRegistry));
+            emit ENS.NewOwner(usernameRegistrar.ensNode(), label, address(usernameRegistrar));
+            vm.expectEmit(true, true, true, true, address(ensRegistry));
+            emit ENS.NewResolver(nameHash, address(publicResolver));
+
+            if(account != address(0)) {
+                vm.expectEmit(true, true, true, true, address(publicResolver));
+                emit PublicResolver.AddrChanged(nameHash, account);
+            }
+            if(pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
+                vm.expectEmit(true, true, true, true, address(publicResolver));
+                emit PublicResolver.PubkeyChanged(nameHash, pubkeyA, pubkeyB);
+            }
+            vm.expectEmit(true, true, true, true, address(ensRegistry));
+            emit ENS.Transfer(nameHash, registrant);
+        }else {
+            vm.expectEmit(true, true, true, true, address(ensRegistry));
+            emit ENS.NewOwner(usernameRegistrar.ensNode(), label, registrant);
+        }
+        vm.expectEmit(true, true, true, true, address(usernameRegistrar));
+        
+        emit UsernameRegistrar.UsernameOwner(nameHash, registrant);
+        vm.prank(registrant);
+        if(approveAndCall){
+            testToken.approveAndCall(
+                address(usernameRegistrar),
+                price,
+                abi.encodePacked(UsernameRegistrar.register.selector, abi.encode(label, account, pubkeyA, pubkeyB))
+            );
+        }else {
+            usernameRegistrar.register(label, account, pubkeyA, pubkeyB);
+        }
+        
+
     }
 
     function registerName(
-        TestToken token,
         UsernameRegistrar usernameRegistrar,
         address registrant,
         string memory username
@@ -76,7 +123,7 @@ contract ENSDependentTest is Test {
         internal
         returns (bytes32 label, bytes32 nameHash)
     {
-        return registerName(token, usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
+        return registerName(usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
     }
 
     function generateXY(bytes memory pub) internal pure returns (bytes32, bytes32) {
@@ -180,7 +227,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testRegisterUsername() public {
         address registrant = testUser;
         string memory username = "testuser";
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
 
         uint256 price = usernameRegistrar.price();
 
@@ -194,7 +241,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testReleaseUsername() public {
         address registrant = testUser;
         string memory username = "releasetest";
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
 
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
 
@@ -233,7 +280,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         string memory username = "a";
 
         address registrant = testUser;
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 123_456;
@@ -252,7 +299,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         string memory username = "0xc6b95bd261233213";
 
         address registrant = testUser;
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
 
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
@@ -274,7 +321,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         address registrant = testUser;
         string memory username = "bob";
         (bytes32 label, bytes32 namehash) =
-            registerName(testToken, usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
+            registerName(usernameRegistrar, registrant, username, address(0), bytes32(0), bytes32(0));
         uint256 price = usernameRegistrar.price();
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
         assertEq(address(ensRegistry.resolver(namehash)), address(0), "It shouldnt have a resolver");
@@ -288,7 +335,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         address registrant = testUser;
         string memory username = "bob";
         (bytes32 label, bytes32 namehash) =
-            registerName(testToken, usernameRegistrar, registrant, username, registrant, bytes32(0), bytes32(0));
+            registerName(usernameRegistrar, registrant, username, registrant, bytes32(0), bytes32(0));
         uint256 price = usernameRegistrar.price();
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
         assertEq(
@@ -312,7 +359,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         (bytes32 x, bytes32 y) = generateXY(contactCode);
 
         (bytes32 label, bytes32 namehash) =
-            registerName(testToken, usernameRegistrar, registrant, username, address(0), x, y);
+            registerName(usernameRegistrar, registrant, username, address(0), x, y);
         uint256 price = usernameRegistrar.price();
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
         assertEq(
@@ -330,43 +377,17 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         address registrant = testUser;
         address account = makeAddr("account");
         string memory username = "bob2";
-        bytes32 label = keccak256(abi.encodePacked(username));
-        uint256 registryPrice = usernameRegistrar.price();
-        bytes32 usernameHash = getNameHash(usernameRegistrar.ensNode(), label);
+        
+        
         bytes memory contactCode =
             hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
-
         (bytes32 x, bytes32 y) = generateXY(contactCode);
-        testToken.mint(registrant, registryPrice);
-        vm.startPrank(registrant);
 
-        vm.expectEmit(true, true, true, true, address(testToken));
-        emit ERC20Token.Approval(registrant, address(usernameRegistrar), registryPrice);
-        vm.expectEmit(true, true, true, true, address(testToken));
-        emit ERC20Token.Transfer(registrant, address(usernameRegistrar), registryPrice);
-        vm.expectEmit(true, true, true, true, address(ensRegistry));
-        emit ENS.NewOwner(usernameRegistrar.ensNode(), label, address(usernameRegistrar));
-        vm.expectEmit(true, true, true, true, address(ensRegistry));
-        emit ENS.NewResolver(usernameHash, address(publicResolver));
-        vm.expectEmit(true, true, true, true, address(publicResolver));
-        emit PublicResolver.AddrChanged(usernameHash, account);
-        vm.expectEmit(true, true, true, true, address(publicResolver));
-        emit PublicResolver.PubkeyChanged(usernameHash, x, y);
-        vm.expectEmit(true, true, true, true, address(ensRegistry));
-        emit ENS.Transfer(usernameHash, registrant);
-
-        testToken.approveAndCall(
-            address(usernameRegistrar),
-            registryPrice,
-            abi.encodePacked(UsernameRegistrar.register.selector, abi.encode(label, account, x, y))
-        );
-
-        vm.stopPrank();
-
+        (bytes32 label, bytes32 usernameHash) = registerName(usernameRegistrar, registrant, username, account, x, y);
         // Assert results
         assertEq(ensRegistry.owner(usernameHash), registrant, "ENSRegistry owner mismatch");
         assertEq(ensRegistry.resolver(usernameHash), address(publicResolver), "Resolver wrongly defined");
-        assertEq(usernameRegistrar.getAccountBalance(label), registryPrice, "Wrong account balance");
+        assertEq(usernameRegistrar.getAccountBalance(label), usernameRegistrar.price(), "Wrong account balance");
         assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch");
         assertEq(publicResolver.addr(usernameHash), account, "Resolved address not set");
 
@@ -379,7 +400,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testSlashInvalidUsername() public {
         address registrant = testUser;
         string memory username = "alic\u00e9";
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 1337;
@@ -399,7 +420,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
     function testShouldNotSlashValidUsername() public {
         address registrant = testUser;
         string memory username = "legituser";
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
         vm.warp(block.timestamp + usernameRegistrar.releaseDelay() / 2);
 
         uint256 reserveSecret = 1337;
@@ -419,7 +440,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         string memory username = "0xc6b95bd26";
 
         address registrant = testUser;
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
@@ -440,7 +461,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
 
         address registrant = testUser;
 
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
@@ -459,7 +480,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         string memory username = "0xprotocolstatus";
         address registrant = testUser;
 
-        (bytes32 label, bytes32 namehash) = registerName(testToken, usernameRegistrar, registrant, username);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
 
         uint256 reserveSecret = 1337;
         address slasher = makeAddr("slasher");
