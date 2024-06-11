@@ -51,9 +51,13 @@ contract ENSDependentTest is Test {
         address account,
         bytes32 pubkeyA,
         bytes32 pubkeyB
-    ) internal returns (bytes32 label, bytes32 nameHash) {
+    )
+        internal
+        returns (bytes32 label, bytes32 nameHash)
+    {
         return registerName(usernameRegistrar, registrant, username, account, pubkeyA, pubkeyB, false);
     }
+
     function registerName(
         UsernameRegistrar usernameRegistrar,
         address registrant,
@@ -69,54 +73,51 @@ contract ENSDependentTest is Test {
         label = keccak256(abi.encodePacked(username));
         nameHash = getNameHash(usernameRegistrar.ensNode(), label);
         uint256 price = usernameRegistrar.price();
-        if(price > 0) {
+        if (price > 0) {
             testToken.mint(registrant, price);
             vm.expectEmit(true, true, true, true, address(testToken));
             emit ERC20Token.Approval(registrant, address(usernameRegistrar), price);
-            if(!approveAndCall){
+            if (!approveAndCall) {
                 vm.prank(registrant);
                 testToken.approve(address(usernameRegistrar), price);
             }
-                
         }
-        
+
         vm.expectEmit(true, true, true, true, address(testToken));
         emit ERC20Token.Transfer(registrant, address(usernameRegistrar), price);
-        if(account != address(0) || pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
+        if (account != address(0) || pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
             vm.expectEmit(true, true, true, true, address(ensRegistry));
             emit ENS.NewOwner(usernameRegistrar.ensNode(), label, address(usernameRegistrar));
             vm.expectEmit(true, true, true, true, address(ensRegistry));
             emit ENS.NewResolver(nameHash, address(publicResolver));
 
-            if(account != address(0)) {
+            if (account != address(0)) {
                 vm.expectEmit(true, true, true, true, address(publicResolver));
                 emit PublicResolver.AddrChanged(nameHash, account);
             }
-            if(pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
+            if (pubkeyA != bytes32(0) || pubkeyB != bytes32(0)) {
                 vm.expectEmit(true, true, true, true, address(publicResolver));
                 emit PublicResolver.PubkeyChanged(nameHash, pubkeyA, pubkeyB);
             }
             vm.expectEmit(true, true, true, true, address(ensRegistry));
             emit ENS.Transfer(nameHash, registrant);
-        }else {
+        } else {
             vm.expectEmit(true, true, true, true, address(ensRegistry));
             emit ENS.NewOwner(usernameRegistrar.ensNode(), label, registrant);
         }
         vm.expectEmit(true, true, true, true, address(usernameRegistrar));
-        
+
         emit UsernameRegistrar.UsernameOwner(nameHash, registrant);
         vm.prank(registrant);
-        if(approveAndCall){
+        if (approveAndCall) {
             testToken.approveAndCall(
                 address(usernameRegistrar),
                 price,
                 abi.encodePacked(UsernameRegistrar.register.selector, abi.encode(label, account, pubkeyA, pubkeyB))
             );
-        }else {
+        } else {
             usernameRegistrar.register(label, account, pubkeyA, pubkeyB);
         }
-        
-
     }
 
     function registerName(
@@ -283,6 +284,109 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         assertEq(usernameRegistrar.getAccountOwner(label), address(0), "Account owner should be zero after release");
     }
 
+    function testReleaseUsernameByNewOwner() public {
+        address registrant = testUser;
+        string memory username = "releasetest";
+        address newUser = makeAddr("newUser");
+
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
+        vm.prank(registrant);
+        ensRegistry.setOwner(namehash, newUser);
+
+        vm.prank(registrant);
+        vm.expectRevert("Not owner of ENS node.");
+        usernameRegistrar.release(label);
+
+        vm.prank(newUser);
+        usernameRegistrar.release(label);
+
+        assertEq(ensRegistry.owner(namehash), address(0), "ENS owner should be zero after release");
+        assertEq(usernameRegistrar.getAccountBalance(label), 0, "Account balance should be zero after release");
+        assertEq(usernameRegistrar.getAccountOwner(label), address(0), "Account owner should be zero after release");
+    }
+
+    function testShouldNotReleaseUsernameBeforeDelay() public {
+        address registrant = testUser;
+        string memory username = "releasetest";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() - 1);
+
+        vm.prank(registrant);
+        vm.expectRevert("Release period not reached.");
+        usernameRegistrar.release(label);
+    }
+
+    function testShouldNotReleaseUsernameFromOther() public {
+        address registrant = testUser;
+        string memory username = "releasetest";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
+
+        vm.prank(deployer);
+        vm.expectRevert("Not owner of ENS node.");
+        usernameRegistrar.release(label);
+    }
+
+    function testShouldNotReleaseUsernameNotRegistered() public {
+        address registrant = testUser;
+        string memory username = "releasetest";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
+
+        vm.prank(registrant);
+        vm.expectRevert("Username not registered.");
+        usernameRegistrar.release(keccak256("anyname"));
+    }
+
+    function testReleaseWhenMigrated() public {
+        address registrant = testUser;
+        string memory username = "releasetest";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
+
+        vm.prank(deployer);
+        usernameRegistrar.moveRegistry(updatedUsernameRegistrar);
+
+        vm.prank(registrant);
+        usernameRegistrar.release(label);
+
+        assertEq(ensRegistry.owner(namehash), address(0), "ENS owner should be zero after release");
+        assertEq(usernameRegistrar.getAccountBalance(label), 0, "Account balance should be zero after release");
+        assertEq(usernameRegistrar.getAccountOwner(label), address(0), "Account owner should be zero after release");
+    }
+
+    function testReleaseWhenMigratedByOldOwner() public {
+        address registrant = testUser;
+        address newUser = makeAddr("newUser");
+        string memory username = "releasetest";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username);
+
+        vm.warp(block.timestamp + usernameRegistrar.releaseDelay() + 1);
+
+        vm.prank(deployer);
+        usernameRegistrar.moveRegistry(updatedUsernameRegistrar);
+
+        vm.prank(registrant);
+        ensRegistry.setOwner(namehash, newUser);
+
+        vm.prank(newUser);
+        vm.expectRevert("Not the former account owner.");
+        usernameRegistrar.release(label);
+
+        vm.prank(registrant);
+        usernameRegistrar.release(label);
+
+        assertEq(ensRegistry.owner(namehash), address(0), "ENS owner should be zero after release");
+        assertEq(usernameRegistrar.getAccountBalance(label), 0, "Account balance should be zero after release");
+        assertEq(usernameRegistrar.getAccountOwner(label), address(0), "Account owner should be zero after release");
+    }
+
     function testUpdateRegistryPrice() public {
         uint256 newPrice = 2000;
         vm.prank(deployer);
@@ -421,8 +525,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
 
         (bytes32 x, bytes32 y) = generateXY(contactCode);
 
-        (bytes32 label, bytes32 namehash) =
-            registerName(usernameRegistrar, registrant, username, address(0), x, y);
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username, address(0), x, y);
         uint256 price = usernameRegistrar.price();
         assertEq(ensRegistry.owner(namehash), registrant, "Registrant should own the username hash in ENS registry");
         assertEq(
@@ -463,8 +566,7 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         address registrant = testUser;
         address account = makeAddr("account");
         string memory username = "bob2";
-        
-        
+
         bytes memory contactCode =
             hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
         (bytes32 x, bytes32 y) = generateXY(contactCode);
@@ -487,13 +589,13 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
         address registrant = testUser;
         address account = makeAddr("account");
         string memory username = "bob2";
-        
-        
+
         bytes memory contactCode =
             hex"04dbb31252d9bddb4e4d362c7b9c80cba74732280737af97971f42ccbdc716f3f3efb1db366880e52d09b1bfd59842e833f3004088892b7d14b9ce9e957cea9a82";
         (bytes32 x, bytes32 y) = generateXY(contactCode);
 
-        (bytes32 label, bytes32 usernameHash) = registerName(usernameRegistrar, registrant, username, account, x, y, true);
+        (bytes32 label, bytes32 usernameHash) =
+            registerName(usernameRegistrar, registrant, username, account, x, y, true);
         // Assert results
         assertEq(ensRegistry.owner(usernameHash), registrant, "ENSRegistry owner mismatch");
         assertEq(ensRegistry.resolver(usernameHash), address(publicResolver), "Resolver wrongly defined");
