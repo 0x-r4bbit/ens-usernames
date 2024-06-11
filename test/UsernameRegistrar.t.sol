@@ -223,6 +223,11 @@ contract UsernameRegistrarTestActivate is ENSDependentTest {
         assertEq(usernameRegistrar.price(), initialPrice, "Registry price mismatch after activation");
         assertEq(uint8(usernameRegistrar.state()), 1, "Registry state should be active");
     }
+
+    function testRegisterUnactivated() public {
+        vm.expectRevert("Registry not active.");
+        usernameRegistrar.register(keccak256("name"), address(0), bytes32(0), bytes32(0));
+    }
 }
 
 contract UsernameRegistrarTestRegister is ENSDependentTest {
@@ -253,6 +258,40 @@ contract UsernameRegistrarTestRegister is ENSDependentTest {
             usernameRegistrar.getAccountBalance(label), price, "Account balance should equal the registration price"
         );
         assertEq(usernameRegistrar.getAccountOwner(label), registrant, "Account owner mismatch after registration");
+    }
+
+    function testRegisterUsernameWithNoAllowanceOrBalance() public {
+        vm.expectRevert("Unallowed to spend.");
+        usernameRegistrar.register(keccak256("name"), address(0), bytes32(0), bytes32(0));
+
+        testToken.approve(address(usernameRegistrar), usernameRegistrar.price() - 1);
+        vm.expectRevert("Unallowed to spend.");
+        usernameRegistrar.register(keccak256("name"), address(0), bytes32(0), bytes32(0));
+
+        testToken.approve(address(usernameRegistrar), 0);
+        testToken.approve(address(usernameRegistrar), usernameRegistrar.price());
+        vm.expectRevert("Transfer failed");
+        usernameRegistrar.register(keccak256("name"), address(0), bytes32(0), bytes32(0));
+    }
+
+    function testRegisterAlreadyInUse() public {
+        bytes32 ensNode = usernameRegistrar.ensNode();
+        bytes32 impossibleCase = keccak256("anyname");
+        address registrant = testUser;
+
+        vm.prank(address(usernameRegistrar));
+        ensRegistry.setSubnodeOwner(ensNode, impossibleCase, registrant);
+        vm.expectRevert("ENS node already owned.");
+        usernameRegistrar.register(impossibleCase, address(0), bytes32(0), bytes32(0));
+
+        string memory username = "testuser";
+        (bytes32 label, bytes32 namehash) = registerName(usernameRegistrar, registrant, username, true);
+
+        vm.prank(registrant);
+        ensRegistry.setOwner(namehash, address(0));
+
+        vm.expectRevert("Username already registered.");
+        usernameRegistrar.register(label, address(0), bytes32(0), bytes32(0));
     }
 
     function testRegisterUsernameApproveAndCall() public {
